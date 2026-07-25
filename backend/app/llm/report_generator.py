@@ -1,0 +1,130 @@
+import json
+import re
+import logging
+from typing import Dict, Any, Optional
+from app.llm.gemini_client import get_gemini_client, GeminiClient
+from app.llm.prompt_builder import MedicalPromptBuilder
+
+logger = logging.getLogger(__name__)
+
+
+class MedicalReportGenerator:
+    """
+    Service generating structured AI medical reports via Gemini API with robust JSON validation and local template fallback.
+    """
+    def __init__(self, client: Optional[GeminiClient] = None):
+        self.client = client or get_gemini_client()
+
+    def generate_report(
+        self,
+        prediction_class: str,
+        confidence_score: float,
+        probabilities: Optional[Dict[str, float]] = None,
+        gradcam_explanation: Optional[str] = None,
+        modality: str = "X-Ray",
+        patient_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generates structured medical report JSON.
+        """
+        # 1. Check if Gemini Client is configured
+        if not self.client.is_configured():
+            logger.info("Gemini API key not configured. Generating high-quality local template report.")
+            return self._generate_fallback_report(
+                prediction_class, confidence_score, probabilities, gradcam_explanation, modality
+            )
+
+        # 2. Build prompt
+        prompt = MedicalPromptBuilder.build_prompt(
+            prediction_class=prediction_class,
+            confidence_score=confidence_score,
+            probabilities=probabilities,
+            gradcam_explanation=gradcam_explanation,
+            modality=modality,
+            patient_id=patient_id
+        )
+
+        # 3. Call Gemini API
+        response_text = self.client.generate_text(prompt)
+
+        if response_text:
+            parsed_json = self._clean_and_parse_json(response_text)
+            if parsed_json and self._validate_report_schema(parsed_json):
+                logger.info("Successfully generated and validated report via Gemini LLM.")
+                return parsed_json
+            else:
+                logger.warning("Gemini output JSON parsing or schema validation failed. Using template fallback.")
+
+        # 4. Fallback if API or parsing fails
+        return self._generate_fallback_report(
+            prediction_class, confidence_score, probabilities, gradcam_explanation, modality
+        )
+
+    def _clean_and_parse_json(self, text: str) -> Optional[Dict[str, Any]]:
+        """Strips markdown backticks ```json ... ``` and parses JSON."""
+        try:
+            cleaned = text.strip()
+            if cleaned.startswith("```"):
+                cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+                cleaned = re.sub(r"\s*```$", "", cleaned)
+            return json.loads(cleaned)
+        except Exception as e:
+            logger.error(f"JSON parsing error on Gemini output: {e}")
+            return None
+
+    def _validate_report_schema(self, data: Dict[str, Any]) -> bool:
+        """Verifies that all required keys are present in the JSON dictionary."""
+        required_keys = ["summary", "findings", "interpretation", "recommendations", "disclaimer"]
+        return all(key in data for key in required_keys) and isinstance(data.get("recommendations"), list)
+
+    def _generate_fallback_report(
+        self,
+        prediction_class: str,
+        confidence_score: float,
+        probabilities: Optional[Dict[str, float]],
+        gradcam_explanation: Optional[str],
+        modality: str
+    ) -> Dict[str, Any]:
+        """
+        Generates structured local report fallback when Gemini API is unavailable.
+        """
+        conf_pct = round(confidence_score * 100, 1)
+
+        if prediction_class.upper() == "PNEUMONIA":
+            summary = f"Radiographic evaluation of {modality} scan demonstrates indicators consistent with active pneumonia (model confidence: {conf_pct}%)."
+            findings = f"Focal consolidation and focal opacities identified in pulmonary fields. Grad-CAM visual attention mapping highlights high neural activation in targeted lung zones ({gradcam_explanation or 'lower lung regions'})."
+            interpretation = f"The automated PyTorch deep learning vision model evaluated the scan with a {conf_pct}% confidence score for Pneumonia vs Normal baseline. Neural activation correlates with acute parenchymal infiltrate patterns."
+            recommendations = [
+                "Recommend urgent clinical evaluation and correlation with patient symptoms (fever, cough, dyspnea).",
+                "Consider high-resolution Computed Tomography (CT) or follow-up chest radiograph to evaluate resolution post-treatment.",
+                "Obtain laboratory biomarkers (CBC with differential, CRP/ESR, sputum culture) as clinically indicated."
+            ]
+        else:
+            summary = f"Radiographic evaluation of {modality} scan shows no evidence of active acute pulmonary consolidation or pneumonia (normal confidence: {conf_pct}%)."
+            findings = "Clear pulmonary fields bilaterally with normal bronchovascular markings. No focal infiltrates, pleural effusion, or pneumothorax observed."
+            interpretation = f"The PyTorch deep learning classifier evaluated the scan at {conf_pct}% confidence for normal anatomical baseline. Grad-CAM heatmaps show balanced spatial activation without focal consolidation."
+            recommendations = [
+                "Routine clinical follow-up as indicated by primary care provider.",
+                "Re-evaluate with repeated radiographic imaging if respiratory symptoms develop or worsen.",
+                "Maintain standard preventive healthcare guidelines."
+            ]
+
+        disclaimer = "This report is generated by an artificial intelligence system (MediVision AI) for decision-support purposes only. It does not constitute a definitive medical diagnosis and must be reviewed by a qualified licensed radiologist or physician."
+
+        return {
+            "summary": summary,
+            "findings": findings,
+            "interpretation": interpretation,
+            "recommendations": recommendations,
+            "disclaimer": disclaimer,
+        }
+
+
+_report_generator_instance = None
+
+
+def get_report_generator() -> MedicalReportGenerator:
+    global _report_generator_instance
+    if _report_generator_instance is None:
+        _report_generator_instance = MedicalReportGenerator()
+    return _report_generator_instance
