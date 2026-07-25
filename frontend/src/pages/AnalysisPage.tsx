@@ -127,19 +127,19 @@ export const AnalysisPage: React.FC = () => {
                 onChange={(e) => setModality(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-sans"
               >
-                <option value="X-Ray">Chest X-Ray (Active Deep Learning Model)</option>
-                <option value="MRI">Brain / Spine MRI (Coming Soon — Roadmap)</option>
-                <option value="CT">Computed Tomography CT (Coming Soon — Roadmap)</option>
-                <option value="Mammography">Mammography Scan (Coming Soon — Roadmap)</option>
-                <option value="ECG">ECG / Cardiac Trace (Coming Soon — Roadmap)</option>
+                <option value="X-Ray">Chest X-Ray (Local PyTorch Deep Learning Model)</option>
+                <option value="MRI">Brain / Spine MRI (Gemini Vision)</option>
+                <option value="CT">Computed Tomography CT (Gemini Vision)</option>
+                <option value="Mammography">Mammography Scan (Gemini Vision)</option>
+                <option value="ECG">ECG / Cardiac Trace (Gemini Vision)</option>
               </select>
             </div>
 
             {modality !== 'X-Ray' && (
-              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-xs flex items-start space-x-2.5">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+              <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl text-cyan-300 text-xs flex items-start space-x-2.5">
+                <Sparkles className="h-4 w-4 shrink-0 mt-0.5 text-cyan-400" />
                 <span className="leading-relaxed">
-                  This scan type is on our clinical roadmap. Currently, only <strong>Chest X-Ray</strong> analysis is supported by the trained deep learning model.
+                  This scan will be processed by the <strong>Google Gemini Vision</strong> multimodal engine. (Grad-CAM heatmaps are local to PyTorch and will be bypassed).
                 </span>
               </div>
             )}
@@ -162,11 +162,10 @@ export const AnalysisPage: React.FC = () => {
                   type="file"
                   accept="image/*"
                   onChange={handleFileSelect}
-                  disabled={modality !== 'X-Ray'}
                   className="hidden"
                   id="image-upload-input"
                 />
-                <label htmlFor="image-upload-input" className={`space-y-3 block ${modality === 'X-Ray' ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                <label htmlFor="image-upload-input" className="space-y-3 block cursor-pointer">
                   {previewUrl ? (
                     <img src={previewUrl} alt="Scan Preview" className="h-44 max-w-full mx-auto rounded-xl object-cover border border-slate-700 shadow-md" />
                   ) : (
@@ -191,7 +190,7 @@ export const AnalysisPage: React.FC = () => {
 
             <button
               type="submit"
-              disabled={analyzing || !selectedFile || modality !== 'X-Ray'}
+              disabled={analyzing || !selectedFile}
               className="w-full py-4 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-extrabold text-base rounded-xl transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center space-x-2"
             >
               {analyzing ? (
@@ -199,8 +198,6 @@ export const AnalysisPage: React.FC = () => {
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span>Processing Scan...</span>
                 </>
-              ) : modality !== 'X-Ray' ? (
-                <span>Modality Coming Soon (Roadmap)</span>
               ) : (
                 <>
                   <FileScan className="h-5 w-5" />
@@ -257,21 +254,27 @@ export const AnalysisPage: React.FC = () => {
                 <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-slate-800 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="space-y-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">AI Diagnostic Classification</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        {result.modality === 'X-Ray' ? 'AI Diagnostic Classification' : 'Multimodal AI Assessment'}
+                      </span>
                       <div className="flex items-center space-x-3">
                         <span className={`px-4 py-1.5 rounded-full text-lg font-extrabold border shadow-sm ${
-                          result.prediction_class.toUpperCase() === 'PNEUMONIA'
+                          (result.modality === 'X-Ray' && result.prediction_class.toUpperCase() === 'PNEUMONIA') || (result.modality !== 'X-Ray' && result.prediction_class.toUpperCase() !== 'NORMAL')
                             ? 'bg-red-500/10 text-red-400 border-red-500/30'
                             : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                         }`}>
-                          {result.prediction_class.toUpperCase() === 'PNEUMONIA' ? 'Pneumonia Indicated' : 'Normal / No Infiltrates'}
+                          {result.modality === 'X-Ray' 
+                            ? (result.prediction_class.toUpperCase() === 'PNEUMONIA' ? 'Pneumonia Indicated' : 'Normal / No Infiltrates')
+                            : result.prediction_class}
                         </span>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-4">
                       <div className="text-left sm:text-right">
-                        <span className="text-xs text-slate-400 block font-medium">Confidence Rating</span>
+                        <span className="text-xs text-slate-400 block font-medium">
+                          {result.modality === 'X-Ray' ? 'Model Confidence' : 'AI Confidence Rating'}
+                        </span>
                         <span className={`text-3xl font-extrabold ${
                           result.confidence_score >= 0.85 ? 'text-cyan-400' : 'text-amber-400'
                         }`}>
@@ -287,6 +290,34 @@ export const AnalysisPage: React.FC = () => {
                         <Download className="h-4 w-4" />
                         <span>PDF Report</span>
                       </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Analysis Pipeline Info */}
+                <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 space-y-3">
+                  <div className="flex items-center space-x-2 text-cyan-400 font-semibold">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="text-sm">Analysis Pipeline Used</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950 p-4 rounded-lg border border-slate-800/60">
+                    <div>
+                      <span className="block text-slate-500 mb-1 text-[11px] uppercase tracking-wider font-bold">Primary AI Engine</span>
+                      <span className="text-cyan-400 font-semibold text-sm">
+                        {result.modality === 'X-Ray' ? 'Local PyTorch Deep Learning Model' : 'Google Gemini Vision'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-slate-500 mb-1 text-[11px] uppercase tracking-wider font-bold">Explainability</span>
+                      <span className="text-slate-300 font-semibold text-sm">
+                        {result.modality === 'X-Ray' ? 'Grad-CAM Enabled' : 'AI Text Interpretation'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-slate-500 mb-1 text-[11px] uppercase tracking-wider font-bold">Grad-CAM Status</span>
+                      <span className="text-slate-300 font-semibold text-sm">
+                        {result.modality === 'X-Ray' ? 'Active & Rendered' : 'Not Available for Gemini Vision'}
+                      </span>
                     </div>
                   </div>
                 </div>
