@@ -1,8 +1,6 @@
 # 🩺 MediVision AI
 
-MediVision AI is an AI-powered medical intelligence platform designed to assist healthcare professionals in analyzing medical images and generating AI-assisted medical reports.
-
-The application combines Deep Learning, Explainable AI (Grad-CAM), and Google's Gemini AI to provide accurate predictions, visual explanations, and structured medical reports through an easy-to-use web interface.
+MediVision AI is an AI-powered medical intelligence platform that combines deep learning and multimodal large language models to assist in the analysis of medical images and reports. Chest X-rays are processed using a PyTorch-based CNN with Grad-CAM explainability, while additional imaging modalities such as CT and MRI leverage Google Gemini Vision for AI-assisted interpretation.
 
 > **Disclaimer:** This application is developed for educational and research purposes. It is intended to assist healthcare professionals and should not be used as a replacement for clinical judgment or professional medical diagnosis.
 
@@ -56,17 +54,25 @@ The application combines Deep Learning, Explainable AI (Grad-CAM), and Google's 
 # Project Architecture
 
 ```
-                React Frontend
-                       │
-                       ▼
-                 FastAPI Backend
-          ┌────────────┼────────────┐
-          │            │            │
-          ▼            ▼            ▼
-    Deep Learning   Grad-CAM    Gemini AI
-          │
-          ▼
-      PostgreSQL / SQLite
+                    Upload Medical Image
+                             │
+                             ▼
+                  Detect Selected Modality
+                             │
+           ┌─────────────────┴─────────────────┐
+           │                                   │
+           ▼                                   ▼
+      Chest X-Ray                    CT / MRI / ECG / Other
+           │                                   │
+           ▼                                   ▼
+    PyTorch CNN + Grad-CAM           Google Gemini Vision
+           │                                   │
+           └──────────────┬────────────────────┘
+                          ▼
+              Structured Medical Report
+                          │
+                          ▼
+                 PostgreSQL / SQLite
 ```
 
 ---

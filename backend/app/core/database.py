@@ -13,6 +13,8 @@ engine = create_engine(
     db_url,
     connect_args=connect_args,
     echo=False,
+    pool_pre_ping=True,
+    pool_recycle=300,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -92,7 +92,6 @@ export const LoginPage: React.FC = () => {
               <input
                 type="email"
                 required
-                placeholder="doctor@hospital.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3.5 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-sans"
@@ -116,7 +115,6 @@ export const LoginPage: React.FC = () => {
               <input
                 type="password"
                 required
-                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3.5 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-sans"

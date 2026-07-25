@@ -88,7 +88,6 @@ export const RegisterPage: React.FC = () => {
               <input
                 type="text"
                 required
-                placeholder="Dr. Eleanor Vance"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3.5 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-sans"
@@ -103,7 +102,6 @@ export const RegisterPage: React.FC = () => {
               <input
                 type="email"
                 required
-                placeholder="eleanor.vance@hospital.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3.5 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-sans"
@@ -121,7 +119,6 @@ export const RegisterPage: React.FC = () => {
               <input
                 type="password"
                 required
-                placeholder="Min 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3.5 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-sans"
@@ -136,7 +133,6 @@ export const RegisterPage: React.FC = () => {
               <input
                 type="password"
                 required
-                placeholder="Re-enter password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3.5 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-sans"

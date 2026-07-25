@@ -238,7 +238,6 @@ export const SettingsPage: React.FC = () => {
                 <input
                   type="password"
                   required
-                  placeholder="Password or DELETE"
                   value={deleteConfirmInput}
                   onChange={(e) => setDeleteConfirmInput(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-red-500 font-sans"

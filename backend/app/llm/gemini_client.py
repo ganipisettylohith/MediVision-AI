@@ -85,6 +85,32 @@ class GeminiClient:
 
         return None
 
+    def analyze_image_with_vision(self, image: Any, prompt: str, timeout_seconds: float = 15.0, max_retries: int = 2) -> Optional[str]:
+        """
+        Sends an image and a prompt to Gemini API for multimodal vision analysis.
+        """
+        if not self.is_configured():
+            logger.warning("Gemini API key is not configured for vision analysis.")
+            return None
+            
+        if self.sdk_client is not None:
+            for attempt in range(1, max_retries + 1):
+                try:
+                    logger.info(f"Sending vision request to Gemini SDK (attempt {attempt}/{max_retries})...")
+                    response = self.sdk_client.generate_content(
+                        [image, prompt],
+                        generation_config={"temperature": 0.2, "response_mime_type": "application/json"}
+                    )
+                    if response and response.text:
+                        return response.text
+                except Exception as e:
+                    logger.warning(f"Gemini SDK Vision attempt {attempt} failed: {e}")
+                    time.sleep(1.0)
+        else:
+            logger.error("Vision analysis currently requires the google-generativeai SDK.")
+            
+        return None
+
 
 _gemini_client_instance = None
 

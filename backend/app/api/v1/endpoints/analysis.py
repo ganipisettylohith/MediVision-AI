@@ -71,31 +71,59 @@ async def analyze_medical_image(
             detail="The uploaded file appears to be corrupted or is not a valid medical image file."
         )
 
-    # 1. Execute PyTorch Deep Learning inference & Grad-CAM XAI
-    try:
-        logger.info(f"Running model inference on '{filename}'...")
-        prediction = model_service.predict_image(image_bytes=content, modality=modality)
-        logger.info(f"Model inference completed for '{filename}': {prediction['prediction_class']} ({prediction['confidence_score']:.1%})")
-    except Exception as e:
-        logger.error(f"Model inference failed for '{filename}': {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI Diagnostic Engine is temporarily out of service. Please try again shortly."
-        )
+    if modality == "X-Ray":
+        # 1. Execute PyTorch Deep Learning inference & Grad-CAM XAI
+        try:
+            logger.info(f"Running model inference on '{filename}'...")
+            prediction = model_service.predict_image(image_bytes=content, modality=modality)
+            logger.info(f"Model inference completed for '{filename}': {prediction['prediction_class']} ({prediction['confidence_score']:.1%})")
+        except Exception as e:
+            logger.error(f"Model inference failed for '{filename}': {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AI Diagnostic Engine is temporarily out of service. Please try again shortly."
+            )
 
-    # 2. Generate LLM AI Medical Report via Gemini
-    try:
-        report_dict = report_generator.generate_report(
-            prediction_class=prediction["prediction_class"],
-            confidence_score=prediction["confidence_score"],
-            probabilities=prediction.get("probabilities"),
-            gradcam_explanation=prediction.get("ai_explanation"),
-            modality=modality,
-            patient_id=patient_id
-        )
-    except Exception as e:
-        logger.warning(f"Report generator fallback triggered for '{filename}': {str(e)}")
-        report_dict = None
+        # 2. Generate LLM AI Medical Report via Gemini
+        try:
+            report_dict = report_generator.generate_report(
+                prediction_class=prediction["prediction_class"],
+                confidence_score=prediction["confidence_score"],
+                probabilities=prediction.get("probabilities"),
+                gradcam_explanation=prediction.get("ai_explanation"),
+                modality=modality,
+                patient_id=patient_id
+            )
+        except Exception as e:
+            logger.warning(f"Report generator fallback triggered for '{filename}': {str(e)}")
+            report_dict = None
+    else:
+        # Multimodal Vision Analysis for non-X-ray scans (MRI, CT, etc)
+        try:
+            logger.info(f"Routing '{filename}' ({modality}) to Gemini Multimodal Vision API...")
+            fresh_img = Image.open(io.BytesIO(content))
+            vision_result = report_generator.generate_multimodal_report(
+                image=fresh_img,
+                modality=modality,
+                patient_id=patient_id
+            )
+            prediction = {
+                "prediction_class": vision_result.get("prediction_class", "ANALYZED"),
+                "confidence_score": vision_result.get("confidence_score", 0.90),
+                "findings_summary": vision_result.get("findings_summary", "Multimodal vision analysis completed."),
+                "probabilities": None,
+                "original_url": None,
+                "heatmap_url": None,
+                "overlay_url": None,
+                "ai_explanation": "Grad-CAM XAI heatmaps are trained specifically for Chest X-Rays and are currently disabled for this modality."
+            }
+            report_dict = vision_result.get("report")
+        except Exception as e:
+            logger.error(f"Multimodal Vision inference failed for '{filename}': {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Multimodal AI Engine is temporarily out of service. Please try again shortly."
+            )
 
     # 3. Persist record in database
     db_scan = MedicalScan(

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: medivision-api
+    runtime: python
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Set this in the Render dashboard to your Supabase connection string
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: PROJECT_NAME
+        value: "MediVision AI"
+      - key: API_V1_STR
+        value: "/api/v1"
+      - key: CORS_ORIGINS
+        sync: false # You will need to manually set this in the Render dashboard to your Vercel URL
+      - key: GEMINI_API_KEY
+        sync: false # You will need to manually set this in the Render dashboard
