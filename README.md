@@ -18,7 +18,7 @@ The application combines Deep Learning, Explainable AI (Grad-CAM), and Google's 
 - Prediction history management
 - REST API using FastAPI
 - Responsive React frontend
-- SQLite database integration
+- PostgreSQL / SQLite database integration
 - Docker support
 
 ---
@@ -37,7 +37,7 @@ The application combines Deep Learning, Explainable AI (Grad-CAM), and Google's 
 - FastAPI
 - Python
 - SQLAlchemy
-- SQLite
+- PostgreSQL / SQLite
 
 ## Artificial Intelligence
 
@@ -66,7 +66,7 @@ The application combines Deep Learning, Explainable AI (Grad-CAM), and Google's 
     Deep Learning   Grad-CAM    Gemini AI
           │
           ▼
-      SQLite Database
+      PostgreSQL / SQLite
 ```
 
 ---
