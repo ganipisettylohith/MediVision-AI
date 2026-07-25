@@ -1,6 +1,6 @@
-# MediVision AI — End-to-End Smart Chest Scan Diagnostics Platform
+# MediVision AI — Chest X-Ray AI Diagnostics Platform
 
-MediVision AI is an end-to-end medical imaging and diagnostic assistance platform powered by **PyTorch Deep Learning**, **Grad-CAM Explainable AI (XAI)**, **Google Gemini LLM Medical Reports**, **FastAPI**, **Neon PostgreSQL / SQLite**, and **React 18 with TypeScript**.
+MediVision AI is a medical imaging and diagnostic assistance platform currently supporting **Chest X-Ray analysis (pneumonia vs. normal classification)**. The platform is powered by **PyTorch Deep Learning**, **Grad-CAM Explainable AI (XAI)**, **Google Gemini LLM Medical Reports**, **FastAPI**, **Neon PostgreSQL / SQLite**, and **React 18 with TypeScript**.
 
 ---
 
@@ -16,9 +16,9 @@ MediVision AI is an end-to-end medical imaging and diagnostic assistance platfor
 
 ## 🩺 Scan Type Framework & Clinical Roadmap
 
-MediVision AI uses an **honest, capability-focused modality framework**:
-- **Chest X-Ray**: Fully functional active pipeline powered by trained PyTorch deep learning models, Grad-CAM visual heatmaps, and Gemini LLM reports.
-- **Brain MRI, CT Scan, Mammography, ECG**: Marked as **"Coming Soon — Clinical Roadmap"**. Predictions on uncalibrated non-X-ray uploads are intentionally disabled to preserve clinical integrity and prevent misleading outputs.
+Currently, MediVision AI supports **Chest X-Ray analysis (pneumonia vs. normal classification)** using our trained PyTorch deep learning model. 
+
+The platform's upload interface is built with a multi-scan roadmap vision to support additional scan types (Brain MRI, CT Scan, Mammography, ECG) as trained models for each are added. These are shown as **"Coming Soon"** in the app today. Predictions on uncalibrated non-X-ray uploads are intentionally disabled to preserve clinical integrity and prevent misleading outputs.
 
 ---
 
