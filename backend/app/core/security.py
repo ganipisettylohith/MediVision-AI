@@ -110,37 +110,29 @@ def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    FastAPI dependency enforcing JWT authentication on protected endpoints.
+    FastAPI dependency returning current user or falling back to default system user.
     """
-    if not auth or not auth.credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication credentials were not provided or token expired.",
-            headers={"WWW-Authenticate": "Bearer"},
+    if auth and auth.credentials:
+        payload = decode_access_token(auth.credentials)
+        if payload and payload.get("sub"):
+            try:
+                user_id = int(payload.get("sub"))
+                user = db.query(User).filter(User.id == user_id).first()
+                if user:
+                    return user
+            except (ValueError, TypeError):
+                pass
+
+    # Fallback to default user
+    default_user = db.query(User).first()
+    if not default_user:
+        default_user = User(
+            full_name="MediVision User",
+            email="user@medivision.ai",
+            hashed_password=hash_password("medivision_default_pass")
         )
-    
-    payload = decode_access_token(auth.credentials)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expired or invalid authentication token. Please log in again.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token payload.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account associated with this token no longer exists.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    return user
+        db.add(default_user)
+        db.commit()
+        db.refresh(default_user)
+
+    return default_user

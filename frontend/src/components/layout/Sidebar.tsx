@@ -1,20 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileScan, History, User, Settings, HelpCircle } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { LayoutDashboard, FileScan, History, Settings, HelpCircle } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Analyze Scan', path: '/analysis', icon: FileScan },
     { name: 'Scan History', path: '/history', icon: History },
   ];
-
-  if (isAuthenticated) {
-    navItems.push({ name: 'My Profile', path: '/profile', icon: User });
-  }
 
   return (
     <aside className="w-64 glass-panel border-r border-slate-800 p-4 hidden md:flex flex-col justify-between min-h-[calc(100vh-4rem)]">

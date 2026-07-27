@@ -48,7 +48,7 @@ export interface UserResponse {
   email: string;
   created_at: string;
   total_scans: number;
-  last_scan_date?: string;
+  last_scan_date?: string | null;
   settings?: UserSettingsSchema;
 }
 

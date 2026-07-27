@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Moon, Bell, Trash2, AlertTriangle, CheckCircle2, User, Save, ShieldAlert, Info } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Moon, Bell, Trash2, AlertTriangle, CheckCircle2, Save, ShieldAlert, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/api';
 import { UserSettingsSchema } from '../types';
@@ -183,20 +183,6 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="block text-sm font-bold text-white">User Profile Settings</span>
-            <span className="block text-xs text-slate-400">View member details or change your account password.</span>
-          </div>
-          <Link
-            to="/profile"
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center space-x-2 shrink-0"
-          >
-            <User className="h-4 w-4 text-cyan-400" />
-            <span>Go to Profile</span>
-          </Link>
-        </div>
-
-        <div className="pt-4 border-t border-red-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <span className="block text-sm font-bold text-red-400">Delete Account & Permanent Purge</span>
             <span className="block text-xs text-slate-400">Permanently delete your user account and purge all associated scan history.</span>

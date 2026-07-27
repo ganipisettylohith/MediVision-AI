@@ -14,6 +14,6 @@ services:
       - key: API_V1_STR
         value: "/api/v1"
       - key: CORS_ORIGINS
-        sync: false # You will need to manually set this in the Render dashboard to your Vercel URL
+        value: "https://medi-vision-ai-dusky.vercel.app"
       - key: GEMINI_API_KEY
         sync: false # You will need to manually set this in the Render dashboard

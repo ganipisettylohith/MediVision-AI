@@ -22,21 +22,12 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for unified error handling & 401 session expiry redirect
+// Response interceptor for unified error handling
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
     const detail = error.response?.data?.detail;
-
-    if (status === 401) {
-      // Clear expired authentication state
-      localStorage.removeItem('medivision_token');
-      localStorage.removeItem('medivision_user');
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login?expired=true';
-      }
-    }
 
     const customError = {
       message: detail || error.message || 'An unexpected error occurred',

@@ -14,45 +14,45 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const DEFAULT_USER: UserResponse = {
+  id: 1,
+  full_name: 'MediVision User',
+  email: 'user@medivision.ai',
+  created_at: new Date().toISOString(),
+  total_scans: 0,
+  last_scan_date: null,
+  settings: {
+    theme: 'dark',
+    notifications_enabled: true,
+    default_page_size: 10,
+  },
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserResponse | null>(() => {
+  const [user, setUser] = useState<UserResponse>(() => {
     const savedUser = localStorage.getItem('medivision_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    return savedUser ? JSON.parse(savedUser) : DEFAULT_USER;
   });
 
   const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('medivision_token');
+    return localStorage.getItem('medivision_token') || 'demo_token';
   });
 
-  const [loading, setLoading] = useState<boolean>(true);
-
   const refreshUser = async () => {
-    const activeToken = localStorage.getItem('medivision_token');
-    if (!activeToken) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
     try {
       const res = await apiClient.get<UserResponse>('/auth/me');
-      setUser(res.data);
-      localStorage.setItem('medivision_user', JSON.stringify(res.data));
+      if (res.data) {
+        setUser(res.data);
+        localStorage.setItem('medivision_user', JSON.stringify(res.data));
+      }
     } catch (err) {
-      console.error('Failed to fetch current user profile:', err);
-      logout();
-    } finally {
-      setLoading(false);
+      console.warn('Using default user profile:', err);
     }
   };
 
   useEffect(() => {
-    if (token) {
-      refreshUser();
-    } else {
-      setLoading(false);
-    }
-  }, [token]);
+    refreshUser();
+  }, []);
 
   const login = (newToken: string, newUser: UserResponse) => {
     localStorage.setItem('medivision_token', newToken);
@@ -62,19 +62,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    localStorage.removeItem('medivision_token');
-    localStorage.removeItem('medivision_user');
-    setToken(null);
-    setUser(null);
+    // Reset to default active state
+    setUser(DEFAULT_USER);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        token,
-        isAuthenticated: !!token && !!user,
-        loading,
+        token: token || 'demo_token',
+        isAuthenticated: true,
+        loading: false,
         login,
         logout,
         refreshUser,
