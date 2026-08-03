@@ -12,13 +12,10 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ currentScan, onL
   const [priorScans, setPriorScans] = useState<AnalysisRecord[]>([]);
   const [selectedPriorId, setSelectedPriorId] = useState<number | null>(null);
   const [priorScanDetail, setPriorScanDetail] = useState<AnalysisRecord | null>(null);
-  const [loading, setLoading] = useState(false);
   const [linking, setLinking] = useState(false);
 
-  // Fetch candidate prior scans for the same patient ID
   useEffect(() => {
     if (currentScan.patient_id) {
-      setLoading(true);
       apiClient.get<any>('/analysis', { params: { skip: 0, limit: 100 } })
         .then(res => {
           // Filter scans with same patient ID, excluding current scan
@@ -26,8 +23,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ currentScan, onL
           const filtered = scans.filter(s => s.patient_id === currentScan.patient_id && s.id !== currentScan.id);
           setPriorScans(filtered);
         })
-        .catch(err => console.error('Error fetching priors:', err))
-        .finally(() => setLoading(false));
+        .catch(err => console.error('Error fetching priors:', err));
     }
   }, [currentScan.patient_id, currentScan.id]);
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileScan, AlertCircle, Loader2, Eye, Flame, FileText, ChevronDown, ChevronUp, AlertTriangle, Lightbulb, Stethoscope, Sparkles, Download, CheckCircle2, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import { FileScan, AlertCircle, Loader2, Eye, FileText, ChevronDown, ChevronUp, AlertTriangle, Sparkles, Download, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import apiClient, { getPdfReportUrl } from '../services/api';
 import { AnalysisRecord } from '../types';
 import { SliceViewer } from '../components/common/SliceViewer';
@@ -16,7 +16,7 @@ export const AnalysisPage: React.FC = () => {
   const [modality, setModality] = useState('X-Ray');
   const [patientId, setPatientId] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
-  const [pollIntervalId, setPollIntervalId] = useState<number | null>(null);
+  const [pollIntervalId, setPollIntervalId] = useState<any | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
 
@@ -24,7 +24,6 @@ export const AnalysisPage: React.FC = () => {
   const [docResult, setDocResult] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState<number>(50); // 0 to 100
-  const [compareMode, setCompareMode] = useState<'overlay' | 'heatmap' | 'original'>('overlay');
 
   const [isDragOver, setIsDragOver] = useState(false);
 
