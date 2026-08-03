@@ -1,12 +1,16 @@
 import os
 import logging
+import time
+import uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.core.limiter import limiter
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -17,6 +21,8 @@ logger = setup_logging()
 
 outputs_dir = Path(__file__).resolve().parent.parent / "outputs"
 os.makedirs(outputs_dir, exist_ok=True)
+
+
 
 
 @asynccontextmanager
@@ -34,6 +40,21 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.middleware("http")
+async def add_request_id_and_log(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    logger.info(f"[{request_id}] Incoming request: {request.method} {request.url.path}")
+    start_time = time.time()
+    response = await call_next(request)
+    duration = (time.time() - start_time) * 1000
+    response.headers["X-Request-ID"] = request_id
+    logger.info(f"[{request_id}] Completed request in {duration:.2f}ms with status {response.status_code}")
+    return response
+
 
 
 from sqlalchemy.exc import SQLAlchemyError, OperationalError

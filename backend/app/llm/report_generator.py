@@ -1,16 +1,18 @@
 import json
 import re
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from app.llm.gemini_client import get_gemini_client, GeminiClient
 from app.llm.prompt_builder import MedicalPromptBuilder
+from app.schemas.findings import FindingBase
 
 logger = logging.getLogger(__name__)
 
 
 class MedicalReportGenerator:
     """
-    Service generating structured AI medical reports via Gemini API with robust JSON validation and local template fallback.
+    Service generating structured AI medical reports via Gemini API with robust JSON validation,
+    Pydantic schema validation for structured findings (with retry logic), and local template fallback.
     """
     def __init__(self, client: Optional[GeminiClient] = None):
         self.client = client or get_gemini_client()
@@ -22,7 +24,8 @@ class MedicalReportGenerator:
         probabilities: Optional[Dict[str, float]] = None,
         gradcam_explanation: Optional[str] = None,
         modality: str = "X-Ray",
-        patient_id: Optional[str] = None
+        patient_id: Optional[str] = None,
+        comparison_info: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generates structured medical report JSON.
@@ -41,78 +44,137 @@ class MedicalReportGenerator:
             probabilities=probabilities,
             gradcam_explanation=gradcam_explanation,
             modality=modality,
-            patient_id=patient_id
+            patient_id=patient_id,
+            comparison_info=comparison_info
         )
 
-        # 3. Call Gemini API
-        response_text = self.client.generate_text(prompt)
-
-        if response_text:
-            parsed_json = self._clean_and_parse_json(response_text)
-            if parsed_json and self._validate_report_schema(parsed_json):
-                logger.info("Successfully generated and validated report via Gemini LLM.")
-                return parsed_json
-            else:
-                logger.warning("Gemini output JSON parsing or schema validation failed. Using template fallback.")
-
-        # 4. Fallback if API or parsing fails
-        return self._generate_fallback_report(
+        # 3. Call Gemini API with retry logic
+        for attempt in range(2):
+            response_text = self.client.generate_text(prompt)
+            if response_text:
+                parsed_json = self._clean_and_parse_json(response_text)
+                if parsed_json and self._validate_report_schema(parsed_json):
+                    # Validate structured findings
+                    structured_findings = parsed_json.get("structured_findings", [])
+                    valid_findings = []
+                    findings_ok = True
+                    for f in structured_findings:
+                        try:
+                            # Validate using Pydantic
+                            FindingBase(**f)
+                            valid_findings.append(f)
+                        except Exception as val_err:
+                            logger.warning(f"Finding validation failed: {val_err} for finding {f}")
+                            findings_ok = False
+                    
+                    if findings_ok and valid_findings:
+                        logger.info("Successfully generated and validated report via Gemini LLM.")
+                        return parsed_json
+                    else:
+                        logger.warning(f"Structured findings validation failed on attempt {attempt + 1}. Retrying...")
+                else:
+                    logger.warning(f"Gemini output JSON parsing or schema validation failed on attempt {attempt + 1}. Retrying...")
+            
+        # If both attempts fail, or if validation fails, try to repair or wrap in a fallback finding
+        logger.warning("Gemini report generation or validation failed after retries. Repairing / Fallback to unstructured finding.")
+        fallback_data = self._generate_fallback_report(
             prediction_class, confidence_score, probabilities, gradcam_explanation, modality
         )
+        return fallback_data
 
     def generate_multimodal_report(
         self,
         image: Any,
         modality: str,
-        patient_id: Optional[str] = None
+        patient_id: Optional[str] = None,
+        comparison_info: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generates a unified prediction and medical report using Gemini Vision.
         """
         if not hasattr(self.client, 'analyze_image_with_vision') or not self.client.is_configured():
             logger.warning("Gemini Vision not configured. Falling back to local template.")
+            fallback = self._generate_fallback_report("UNCERTAIN", 0.5, None, None, modality)
             return {
                 "prediction_class": "UNCERTAIN",
                 "confidence_score": 0.5,
                 "findings_summary": f"Could not analyze {modality} scan without Gemini Vision API.",
-                "report": self._generate_fallback_report("UNCERTAIN", 0.5, None, None, modality)
+                "report": fallback
             }
+
+        modality_instructions = MedicalPromptBuilder.get_modality_instructions(modality)
+        
+        comparison_directives = ""
+        if comparison_info:
+            comparison_directives = f"\nPRIOR STUDY COMPARISON DATA:\n{comparison_info}\nPlease compare current findings with this prior data.\n"
 
         prompt = f"""
 You are an expert AI radiologist analyzing a {modality} scan.
 Patient ID: {patient_id or 'Unknown'}
 
 Analyze this medical image carefully. Determine if there are any abnormalities.
+In your analysis, pay special attention to:
+{modality_instructions}
+{comparison_directives}
 Return your analysis strictly as a JSON object with the exact following schema:
 {{
-  "prediction_class": "NORMAL or specific finding (e.g., TUMOR, FRACTURE)",
+  "prediction_class": "NORMAL or specific finding (e.g., TUMOR, FRACTURE, CYST, HEMORRHAGE)",
   "confidence_score": 0.95,
   "findings_summary": "One sentence summary of the primary finding.",
   "report": {{
     "summary": "Detailed summary paragraph.",
     "findings": "Detailed description of all visual findings in the scan.",
+    "structured_findings": [
+      {{
+        "label": "<Finding label, e.g. Lesion, Mass, Nodule>",
+        "body_region": "<Anatomical body region, e.g. Right Lower Lobe>",
+        "severity": "<normal, mild, moderate, severe, or critical>",
+        "confidence": <confidence of finding as float between 0.0 and 1.0>,
+        "location_description": "<location description>",
+        "icd10_hint": "<suggested ICD-10 code, or null>"
+      }}
+    ],
     "interpretation": "Clinical interpretation of the findings.",
     "recommendations": ["Recommendation 1", "Recommendation 2"],
+    "qualitative_confidence": "low/moderate/high",
+    "confidence_justification": "Clinical justification for the confidence band chosen.",
     "disclaimer": "This report is generated by an artificial intelligence system (MediVision AI) for decision-support purposes only."
   }}
 }}
 Output only the raw JSON. Do not use markdown backticks.
 """
-        response_text = self.client.analyze_image_with_vision(image, prompt)
-        
-        if response_text:
-            parsed_json = self._clean_and_parse_json(response_text)
-            if parsed_json and "report" in parsed_json and self._validate_report_schema(parsed_json["report"]):
-                logger.info(f"Successfully generated multimodal vision report for {modality}.")
-                return parsed_json
-            else:
-                logger.warning("Gemini Vision output JSON parsing failed. Using template fallback.")
 
+        for attempt in range(2):
+            response_text = self.client.analyze_image_with_vision(image, prompt)
+            if response_text:
+                parsed_json = self._clean_and_parse_json(response_text)
+                if parsed_json and "report" in parsed_json and self._validate_report_schema(parsed_json["report"]):
+                    # Validate structured findings
+                    structured_findings = parsed_json["report"].get("structured_findings", [])
+                    valid_findings = []
+                    findings_ok = True
+                    for f in structured_findings:
+                        try:
+                            FindingBase(**f)
+                            valid_findings.append(f)
+                        except Exception as e:
+                            logger.warning(f"Vision finding validation failed: {e} for finding {f}")
+                            findings_ok = False
+                    
+                    if findings_ok and valid_findings:
+                        logger.info(f"Successfully generated multimodal vision report for {modality}.")
+                        return parsed_json
+                    else:
+                        logger.warning(f"Vision structured findings validation failed on attempt {attempt + 1}. Retrying...")
+                else:
+                    logger.warning(f"Gemini Vision output JSON parsing failed on attempt {attempt + 1}. Retrying...")
+
+        fallback_report = self._generate_fallback_report("UNCERTAIN", 0.5, None, None, modality)
         return {
             "prediction_class": "UNCERTAIN",
             "confidence_score": 0.5,
             "findings_summary": f"Vision analysis failed for {modality}.",
-            "report": self._generate_fallback_report("UNCERTAIN", 0.5, None, None, modality)
+            "report": fallback_report
         }
 
     def _clean_and_parse_json(self, text: str) -> Optional[Dict[str, Any]]:
@@ -154,6 +216,8 @@ Output only the raw JSON. Do not use markdown backticks.
                 "Consider high-resolution Computed Tomography (CT) or follow-up chest radiograph to evaluate resolution post-treatment.",
                 "Obtain laboratory biomarkers (CBC with differential, CRP/ESR, sputum culture) as clinically indicated."
             ]
+            severity = "moderate"
+            label = "Pneumonia Consolidation"
         else:
             summary = f"Radiographic evaluation of {modality} scan shows no evidence of active acute pulmonary consolidation or pneumonia (normal confidence: {conf_pct}%)."
             findings = "Clear pulmonary fields bilaterally with normal bronchovascular markings. No focal infiltrates, pleural effusion, or pneumothorax observed."
@@ -163,16 +227,34 @@ Output only the raw JSON. Do not use markdown backticks.
                 "Re-evaluate with repeated radiographic imaging if respiratory symptoms develop or worsen.",
                 "Maintain standard preventive healthcare guidelines."
             ]
+            severity = "normal"
+            label = "Normal Baseline"
 
         disclaimer = "This report is generated by an artificial intelligence system (MediVision AI) for decision-support purposes only. It does not constitute a definitive medical diagnosis and must be reviewed by a qualified licensed radiologist or physician."
 
-        return {
+        fallback_finding = {
+            "label": label,
+            "body_region": "Pulmonary Fields" if modality.upper() == "X-RAY" else "General Anat",
+            "severity": severity,
+            "confidence": confidence_score,
+            "location_description": "Pulmonary field evaluation segment",
+            "icd10_hint": "J18.9" if prediction_class.upper() == "PNEUMONIA" else None
+        }
+
+        report = {
             "summary": summary,
             "findings": findings,
+            "structured_findings": [fallback_finding],
             "interpretation": interpretation,
             "recommendations": recommendations,
             "disclaimer": disclaimer,
         }
+
+        if modality.upper() != "X-RAY":
+            report["qualitative_confidence"] = "high" if confidence_score > 0.8 else "moderate" if confidence_score > 0.5 else "low"
+            report["confidence_justification"] = "Fallback template qualitative baseline confidence estimation."
+
+        return report
 
 
 _report_generator_instance = None
@@ -183,3 +265,4 @@ def get_report_generator() -> MedicalReportGenerator:
     if _report_generator_instance is None:
         _report_generator_instance = MedicalReportGenerator()
     return _report_generator_instance
+

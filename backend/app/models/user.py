@@ -14,11 +14,15 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False, default="clinician")  # clinician vs admin
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
 
     # Relationships
     scans = relationship("MedicalScan", back_populates="user", cascade="all, delete-orphan")
+    documents = relationship("MedicalReportDocument", back_populates="user", cascade="all, delete-orphan")
     settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
 
 
 class UserSettings(Base):

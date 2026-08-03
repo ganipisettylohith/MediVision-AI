@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-1.5-flash"
 
+    # Public read-only demo mode (Task 6)
+    DEMO_MODE: bool = False
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",

@@ -41,15 +41,17 @@ class ChestXRayPredictor:
 
                 model_name = checkpoint.get("model_name", self.config.MODEL_NAME)
                 self.class_names = checkpoint.get("class_names", self.config.CLASS_NAMES)
+                self.temperature = checkpoint.get("temperature", 1.0)
                 
                 self.model = ChestXRayClassifier(model_name=model_name, num_classes=len(self.class_names), pretrained=False)
                 
                 state_dict = checkpoint.get("model_state_dict", checkpoint)
                 self.model.load_state_dict(state_dict)
                 self.model_loaded = True
-                logger.info(f"Successfully loaded trained PyTorch model ({model_name}) from disk.")
+                logger.info(f"Successfully loaded trained PyTorch model ({model_name}) with calibration temperature={self.temperature} from disk.")
             else:
                 logger.warning(f"Weights file not found at '{self.model_path}'. Initializing baseline {self.config.MODEL_NAME} model.")
+                self.temperature = 1.0
                 self.model = ChestXRayClassifier(model_name=self.config.MODEL_NAME, num_classes=len(self.class_names), pretrained=True)
                 self.model_loaded = True
 
@@ -57,6 +59,7 @@ class ChestXRayPredictor:
             self.model.eval()
         except Exception as e:
             logger.error(f"Error loading model from {self.model_path}: {e}")
+            self.temperature = 1.0
             self.model = ChestXRayClassifier(model_name=self.config.MODEL_NAME, num_classes=len(self.class_names), pretrained=True)
             self.model.to(self.device)
             self.model.eval()
@@ -80,7 +83,10 @@ class ChestXRayPredictor:
             # Evaluate forward pass
             self.model.eval()
             outputs = self.model(tensor)
-            probabilities = F.softmax(outputs, dim=1)[0]
+            
+            # Apply Temperature Scaling Calibration (Task 2)
+            calibrated_outputs = outputs / self.temperature
+            probabilities = F.softmax(calibrated_outputs, dim=1)[0]
             conf, pred_class_idx = torch.max(probabilities, dim=0)
 
             predicted_class = self.class_names[pred_class_idx.item()]

@@ -65,7 +65,30 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": int(expire.timestamp())})
+    to_encode.update({"exp": int(expire.timestamp()), "type": "access"})
+    
+    header = {"alg": "HS256", "typ": "JWT"}
+    header_bytes = _base64url_encode(json.dumps(header).encode('utf-8'))
+    payload_bytes = _base64url_encode(json.dumps(to_encode).encode('utf-8'))
+    
+    signing_input = f"{header_bytes}.{payload_bytes}".encode('utf-8')
+    signature = hmac.new(SECRET_KEY.encode('utf-8'), signing_input, hashlib.sha256).digest()
+    signature_bytes = _base64url_encode(signature)
+    
+    return f"{header_bytes}.{payload_bytes}.{signature_bytes}"
+
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Generates an HS256 signed JWT refresh token (longer lived).
+    """
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=7)  # 7 days expiration
+    
+    to_encode.update({"exp": int(expire.timestamp()), "type": "refresh"})
     
     header = {"alg": "HS256", "typ": "JWT"}
     header_bytes = _base64url_encode(json.dumps(header).encode('utf-8'))
@@ -129,10 +152,28 @@ def get_current_user(
         default_user = User(
             full_name="MediVision User",
             email="user@medivision.ai",
-            hashed_password=hash_password("medivision_default_pass")
+            hashed_password=hash_password("medivision_default_pass"),
+            role="admin"  # Make first user admin for ease of setup
         )
         db.add(default_user)
         db.commit()
         db.refresh(default_user)
 
     return default_user
+
+
+def require_role(allowed_roles: list[str]):
+    """Enforces specific user roles for endpoints."""
+    def dependency(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required role: one of {allowed_roles}."
+            )
+        return current_user
+    return dependency
+
+
+require_clinician = require_role(["clinician", "admin"])
+require_admin = require_role(["admin"])
+
